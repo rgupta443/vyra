@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15
+    container_name: instagram_postgres
+    environment:
+      POSTGRES_USER: instagram_user
+      POSTGRES_PASSWORD: instagram_password
+      POSTGRES_DB: instagram_automation
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U instagram_user -d instagram_automation"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for job queues and caching
+  redis:
+    image: redis:7-alpine
+    container_name: instagram_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI Backend
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: instagram_api
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_USER=instagram_user
+      - POSTGRES_PASSWORD=instagram_password
+      - POSTGRES_DB=instagram_automation
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+    volumes:
+      - .:/app
+      - ./uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # RQ Worker for background jobs
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: instagram_worker
+    environment:
+      - ENVIRONMENT=development
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_USER=instagram_user
+      - POSTGRES_PASSWORD=instagram_password
+      - POSTGRES_DB=instagram_automation
+      - POSTGRES_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+    volumes:
+      - .:/app
+      - ./uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: rq worker generation processing --url redis://redis:6379/0
+
+volumes:
+  postgres_data:
+  redis_data:
