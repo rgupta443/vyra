@@ -11,11 +11,13 @@ psycopg2-binary==2.9.9
 # Redis and job queues
 redis==5.0.1
 rq==1.15.1
+rq-scheduler==0.13.1
 
 # Authentication and security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-decouple==3.8
+cryptography==41.0.7
 
 # HTTP client for external APIs
 httpx==0.25.2
@@ -23,6 +25,16 @@ httpx==0.25.2
 # Data validation
 pydantic==2.5.0
 pydantic-settings==2.1.0
+pydantic[email]==2.5.0
+email-validator==2.1.0
+
+# Image processing
+Pillow==10.1.0
+opencv-python==4.8.1.78
+numpy==1.24.4
+
+# Google OAuth (removed for now - can be added later)
+# google-auth==2.25.2
 
 # Development and testing
 pytest==7.4.3

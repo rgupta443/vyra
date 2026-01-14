@@ -85,7 +85,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: rq worker generation processing --url redis://redis:6379/0
+    command: python -m app.worker.worker --type all
 
 volumes:
   postgres_data:

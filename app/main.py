@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.api.v1.api import api_router
+from app.middleware.session_middleware import SessionValidationMiddleware
 
 app = FastAPI(
     title="Instagram Content Automation API",
@@ -22,6 +23,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add session validation middleware
+app.add_middleware(SessionValidationMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
