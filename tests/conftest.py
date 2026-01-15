@@ -11,8 +11,8 @@ from sqlalchemy.orm import sessionmaker
 os.environ.update({
     "SECRET_KEY": "test-secret-key-for-testing-only",
     "POSTGRES_SERVER": "localhost",
-    "POSTGRES_USER": "postgres",
-    "POSTGRES_PASSWORD": "postgres",
+    "POSTGRES_USER": "instagram_user",
+    "POSTGRES_PASSWORD": "instagram_password",
     "POSTGRES_DB": "instagram_automation",
     "OPENAI_API_KEY": "test-openai-key",
     "NANO_BANANA_API_KEY": "test-nano-banana-key",

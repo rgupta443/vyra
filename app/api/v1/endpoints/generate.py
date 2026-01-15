@@ -1,16 +1,21 @@
 """
 Content generation endpoints.
 """
+import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+logger = logging.getLogger(__name__)
+
 from app.core.dependencies import get_db, get_current_user
 from app.models.user import User
 from app.models.face import Face
+from app.models.generation import PresetType
 from app.services.generation_service import GenerationService
 from app.services.user_service import UserService
 from app.services.plan_service import PlanService
+from app.core.queue import enqueue_image_generation, enqueue_caption_generation
 from app.schemas.generation import (
     GenerationRequest,
     GenerationResponse,
@@ -69,8 +74,29 @@ async def generate_image(
             detail=error_message or "Failed to create generation request"
         )
     
-    # TODO: Queue the generation job here
-    # For now, just return the pending generation
+    # Queue the image generation job (Requirement 5.5, 12.3)
+    try:
+        job = enqueue_image_generation(
+            generation_id=str(generation.id),
+            user_id=str(current_user.id),
+            face_id=str(active_face.id),
+            preset_type=request.preset_type.value,
+            format_type=request.format_type.value
+        )
+        logger.info(f"Queued image generation job {job.id} for generation {generation.id}")
+    except Exception as e:
+        logger.error(f"Failed to queue generation job: {e}")
+        # Mark generation as failed and refund credit
+        GenerationService.fail_generation(
+            db, str(generation.id),
+            f"Failed to queue generation job: {str(e)}",
+            refund_credit=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to queue generation job"
+        )
+    
     return generation
 
 

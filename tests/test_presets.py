@@ -109,8 +109,13 @@ def test_brand_safety_enforcement():
 
 def test_create_custom_preset(db: Session):
     """Test creating a custom preset."""
+    import uuid
+    
+    # Use a unique name to avoid conflicts from previous test runs
+    unique_name = f"test_preset_{uuid.uuid4().hex[:8]}"
+    
     preset_data = PresetConfigCreate(
-        name="test_preset",
+        name=unique_name,
         prompt_template="Test portrait in professional setting",
         style_parameters={
             "identity_strength": 0.97,
@@ -124,7 +129,7 @@ def test_create_custom_preset(db: Session):
     preset, error = PresetService.create_preset(db, preset_data)
     assert error is None
     assert preset is not None
-    assert preset.name == "test_preset"
+    assert preset.name == unique_name
     assert preset.style_parameters['identity_strength'] == 0.97
     
     # Try to create duplicate (should fail)

@@ -21,6 +21,8 @@ cryptography==41.0.7
 
 # HTTP client for external APIs
 httpx==0.25.2
+tenacity==8.2.3
+openai==1.6.1
 
 # Data validation
 pydantic==2.5.0

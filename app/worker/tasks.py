@@ -78,6 +78,9 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
     - Nano Banana API integration
     - Format compliance checking
     - Error handling with retry logic
+    - Status tracking and updates
+    
+    Validates Requirements 5.5, 12.3
     
     Args:
         generation_id: UUID of the generation record
@@ -93,6 +96,21 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
         RetryableTaskError: For temporary failures that should be retried
         NonRetryableTaskError: For permanent failures that should not be retried
     """
+    # Import services at module level to avoid UnboundLocalError
+    from app.services.nano_banana_service import (
+        NanoBananaService,
+        IdentityConsistencyError,
+        FormatComplianceError,
+        APIConnectionError
+    )
+    from app.services.preset_service import PresetService
+    from app.services.format_compliance_service import FormatComplianceService
+    from app.services.generation_service import GenerationService
+    from app.core.database import SessionLocal
+    from app.models.face import Face
+    from app.models.generation import PresetType, GenerationStatus, Generation
+    import asyncio
+    
     task_context = {
         "generation_id": generation_id,
         "user_id": user_id,
@@ -101,6 +119,8 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
         "format_type": format_type
     }
     
+    db = SessionLocal()
+    
     try:
         logger.info(f"Starting image generation task for generation {generation_id}")
         
@@ -108,37 +128,141 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
         if not all([generation_id, user_id, face_id, preset_type, format_type]):
             raise NonRetryableTaskError("Missing required parameters for image generation")
         
-        # TODO: Implement actual image generation logic
-        # This will include:
-        # 1. Load face embedding from database
-        # 2. Validate identity consistency requirements
-        # 3. Call Nano Banana API with preset parameters
-        # 4. Validate output format compliance
-        # 5. Store generated image
-        # 6. Update generation record status
+        # Update status to PROCESSING (Requirement 12.3)
+        GenerationService.update_generation_status(
+            db, generation_id, GenerationStatus.PROCESSING
+        )
         
-        # For now, return a placeholder response
-        result = {
-            "generation_id": generation_id,
-            "status": "completed",
-            "message": "Image generation task placeholder - to be implemented",
-            "image_url": None,
-            "identity_strength": None,
-            "format_validated": False,
-            "processing_time_seconds": 0
-        }
+        # Load face embedding from database
+        face = db.query(Face).filter(Face.id == face_id).first()
+        if not face:
+            raise NonRetryableTaskError(f"Face {face_id} not found")
         
-        logger.info(f"Completed image generation task for generation {generation_id}")
-        return result
+        if not face.is_active:
+            raise NonRetryableTaskError(f"Face {face_id} is not active")
         
+        # Get preset configuration
+        preset_enum = PresetType(preset_type)
+        preset = PresetService.get_preset_by_type(db, preset_enum)
+        if not preset:
+            raise NonRetryableTaskError(f"Preset {preset_type} not found")
+        
+        # Get format parameters
+        format_params = FormatComplianceService.get_format_parameters_for_generation(
+            format_type
+        )
+        
+        # Initialize Nano Banana service
+        nano_service = NanoBananaService()
+        
+        try:
+            # Generate image with identity consistency (Requirement 5.5)
+            image_url, identity_strength, metadata = asyncio.run(
+                nano_service.generate_image(
+                    prompt=preset.prompt_template,
+                    face_embedding=face.embedding_data,
+                    face_id=face_id,
+                    style_parameters=preset.style_parameters,
+                    format_config=format_params
+                )
+            )
+            
+            logger.info(
+                f"Image generation successful for generation {generation_id}. "
+                f"Identity strength: {identity_strength:.3f}"
+            )
+            
+            # Validate generation output
+            if not image_url:
+                raise NonRetryableTaskError("Image generation returned no URL")
+            
+            if identity_strength < 0.95:
+                raise IdentityConsistencyError(
+                    f"Identity strength {identity_strength:.3f} below threshold 0.95"
+                )
+            
+            # Update generation with image URL (partial completion)
+            generation = db.query(Generation).filter(Generation.id == generation_id).first()
+            if generation:
+                generation.image_url = image_url
+                generation.metadata = metadata
+                db.commit()
+            
+            # Queue caption generation task
+            from app.core.queue import enqueue_caption_generation
+            try:
+                caption_job = enqueue_caption_generation(
+                    generation_id=generation_id,
+                    image_url=image_url,
+                    preset_type=preset_type
+                )
+                logger.info(
+                    f"Queued caption generation job {caption_job.id} for generation {generation_id}"
+                )
+            except Exception as e:
+                logger.error(f"Failed to queue caption generation: {e}")
+                # Don't fail the image generation if caption queueing fails
+            
+            result = {
+                "generation_id": generation_id,
+                "status": "completed",
+                "image_url": image_url,
+                "identity_strength": identity_strength,
+                "format_validated": True,
+                "metadata": metadata
+            }
+            
+            logger.info(f"Image generation task completed for generation {generation_id}")
+            return result
+            
+        finally:
+            # Close the async client
+            asyncio.run(nano_service.close())
+        
+    except IdentityConsistencyError as e:
+        # Identity consistency failure - not retryable
+        logger.error(f"Identity consistency failure for generation {generation_id}: {e}")
+        GenerationService.fail_generation(
+            db, generation_id, 
+            f"Identity consistency failure: {str(e)}",
+            refund_credit=True
+        )
+        raise NonRetryableTaskError(f"Identity consistency failure: {str(e)}")
+    
+    except FormatComplianceError as e:
+        # Format compliance failure - not retryable
+        logger.error(f"Format compliance failure for generation {generation_id}: {e}")
+        GenerationService.fail_generation(
+            db, generation_id,
+            f"Format compliance failure: {str(e)}",
+            refund_credit=True
+        )
+        raise NonRetryableTaskError(f"Format compliance failure: {str(e)}")
+    
+    except APIConnectionError as e:
+        # API connection error - retryable
+        logger.warning(f"API connection error for generation {generation_id}: {e}")
+        # Don't update status yet - let retry mechanism handle it
+        raise RetryableTaskError(f"API connection error: {str(e)}")
+    
     except (RetryableTaskError, NonRetryableTaskError):
         # Re-raise custom task errors
         raise
+    
     except Exception as e:
         # Handle unexpected errors
+        logger.error(f"Unexpected error in image generation for {generation_id}: {e}")
+        GenerationService.fail_generation(
+            db, generation_id,
+            f"Unexpected error: {str(e)}",
+            refund_credit=True
+        )
         error_result = _handle_task_error("generate_image_task", e, **task_context)
         # Convert to retryable error to trigger retry mechanism
         raise RetryableTaskError(f"Unexpected error in image generation: {str(e)}")
+    
+    finally:
+        db.close()
 
 
 def process_face_embedding_task(face_id: str, image_path: str) -> Dict[str, Any]:
@@ -209,13 +333,15 @@ def process_face_embedding_task(face_id: str, image_path: str) -> Dict[str, Any]
 
 def generate_caption_task(generation_id: str, image_url: str, preset_type: str) -> Dict[str, Any]:
     """
-    Background task for generating captions and hashtags.
+    Background task for generating captions, hashtags, and locations.
     
     This task handles:
     - OpenAI GPT-4 integration for caption generation
     - Hashtag optimization (8-12 hashtags)
     - Location suggestion generation
     - Brand safety validation
+    
+    Validates Requirements 9.1, 9.2, 9.5, 10.1, 10.3, 10.5, 11.2, 11.4, 11.5
     
     Args:
         generation_id: UUID of the generation record
@@ -229,11 +355,20 @@ def generate_caption_task(generation_id: str, image_url: str, preset_type: str) 
         RetryableTaskError: For temporary failures that should be retried
         NonRetryableTaskError: For permanent failures that should not be retried
     """
+    from app.services.caption_service import CaptionService
+    from app.services.hashtag_service import HashtagService
+    from app.services.location_service import LocationService
+    from app.services.generation_service import GenerationService
+    from app.core.database import SessionLocal
+    import asyncio
+    
     task_context = {
         "generation_id": generation_id,
         "image_url": image_url,
         "preset_type": preset_type
     }
+    
+    db = SessionLocal()
     
     try:
         logger.info(f"Starting caption generation for generation {generation_id}")
@@ -242,37 +377,90 @@ def generate_caption_task(generation_id: str, image_url: str, preset_type: str) 
         if not all([generation_id, image_url, preset_type]):
             raise NonRetryableTaskError("Missing required parameters for caption generation")
         
-        # TODO: Implement actual caption generation logic
-        # This will include:
-        # 1. Analyze generated image
-        # 2. Call OpenAI GPT-4 for caption generation
-        # 3. Generate 8-12 relevant hashtags
-        # 4. Suggest appropriate locations
-        # 5. Validate brand safety compliance
-        # 6. Update generation record with results
+        # Initialize services
+        caption_service = CaptionService()
+        hashtag_service = HashtagService()
+        location_service = LocationService()
         
-        # For now, return a placeholder response
-        result = {
-            "generation_id": generation_id,
-            "status": "completed",
-            "caption": "Sample caption - to be implemented",
-            "hashtags": ["#sample", "#hashtags", "#placeholder"],
-            "location": "Sample Location",
-            "brand_safe": True,
-            "processing_time_seconds": 0
-        }
-        
-        logger.info(f"Completed caption generation for generation {generation_id}")
-        return result
+        try:
+            # Generate caption (Requirements 9.1, 9.2, 9.5)
+            caption, is_fallback = asyncio.run(
+                caption_service.generate_caption(
+                    preset_type=preset_type,
+                    image_url=image_url
+                )
+            )
+            
+            logger.info(
+                f"Caption generated for {generation_id}: "
+                f"{'(fallback)' if is_fallback else '(AI)'}"
+            )
+            
+            # Generate hashtags (Requirements 10.1, 10.3, 10.5)
+            hashtags = asyncio.run(
+                hashtag_service.generate_hashtags(
+                    preset_type=preset_type,
+                    caption=caption
+                )
+            )
+            
+            logger.info(f"Generated {len(hashtags)} hashtags for {generation_id}")
+            
+            # Generate location suggestion (Requirements 11.2, 11.4, 11.5)
+            location = asyncio.run(
+                location_service.suggest_location(
+                    preset_type=preset_type,
+                    caption=caption
+                )
+            )
+            
+            if location:
+                logger.info(f"Location suggested for {generation_id}: {location}")
+            else:
+                logger.info(f"No location suggested for {generation_id}")
+            
+            # Update generation record with all metadata
+            GenerationService.complete_generation(
+                db=db,
+                generation_id=generation_id,
+                image_url=image_url,
+                caption=caption,
+                hashtags=hashtags,
+                location=location
+            )
+            
+            result = {
+                "generation_id": generation_id,
+                "status": "completed",
+                "caption": caption,
+                "caption_is_fallback": is_fallback,
+                "hashtags": hashtags,
+                "hashtag_count": len(hashtags),
+                "location": location,
+                "brand_safe": True
+            }
+            
+            logger.info(f"Caption generation task completed for generation {generation_id}")
+            return result
+            
+        finally:
+            # Close all async clients
+            asyncio.run(caption_service.close())
+            asyncio.run(hashtag_service.close())
+            asyncio.run(location_service.close())
         
     except (RetryableTaskError, NonRetryableTaskError):
         # Re-raise custom task errors
         raise
     except Exception as e:
         # Handle unexpected errors
+        logger.error(f"Unexpected error in caption generation for {generation_id}: {e}")
         error_result = _handle_task_error("generate_caption_task", e, **task_context)
         # Convert to retryable error to trigger retry mechanism
         raise RetryableTaskError(f"Unexpected error in caption generation: {str(e)}")
+    
+    finally:
+        db.close()
 
 
 def analytics_tracking_task(event_type: str, user_id: str, data: Dict[str, Any]) -> Dict[str, Any]:
