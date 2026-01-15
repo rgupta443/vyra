@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str
     STRIPE_WEBHOOK_SECRET: str
     
+    # Optional Stripe Price IDs for subscription mode
+    STRIPE_BASIC_PRICE_ID: Optional[str] = None
+    STRIPE_PRO_PRICE_ID: Optional[str] = None
+    
     # Google OAuth (optional for development)
     GOOGLE_CLIENT_ID: Optional[str] = None
     GOOGLE_CLIENT_SECRET: Optional[str] = None

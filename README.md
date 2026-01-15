@@ -29,7 +29,7 @@ AI-powered Instagram content generation with face identity consistency.
    # Edit .env with your configuration
    ```
 
-2. **Start with Docker Compose:**
+2. **Start backend with Docker Compose:**
    ```bash
    docker-compose up -d
    ```
@@ -39,7 +39,17 @@ AI-powered Instagram content generation with face identity consistency.
    docker-compose exec api alembic upgrade head
    ```
 
-4. **Access the application:**
+4. **Setup and start frontend:**
+   ```bash
+   cd frontend
+   npm install
+   cp .env.local.example .env.local
+   # Edit .env.local with your configuration
+   npm run dev
+   ```
+
+5. **Access the application:**
+   - Frontend: http://localhost:3000
    - API: http://localhost:8000
    - API Documentation: http://localhost:8000/docs
 
@@ -74,6 +84,12 @@ app/
 ├── core/             # Core configuration and utilities
 ├── models/           # Database models
 └── main.py           # FastAPI application entry point
+
+frontend/             # Next.js frontend application
+├── app/              # Next.js App Router pages
+├── components/       # Reusable React components
+├── lib/              # Utility libraries
+└── types/            # TypeScript type definitions
 
 alembic/              # Database migrations
 docker-compose.yml    # Development environment

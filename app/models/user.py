@@ -27,6 +27,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=True)  # Nullable for OAuth users
     google_id = Column(String, unique=True, nullable=True)
+    stripe_customer_id = Column(String, unique=True, nullable=True)  # Stripe customer ID
     
     plan_type = Column(String, default=PlanType.FREE.value)
     credits = Column(Integer, default=5)  # Free tier gets 5 credits

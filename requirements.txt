@@ -24,6 +24,9 @@ httpx==0.25.2
 tenacity==8.2.3
 openai==1.6.1
 
+# Payment processing
+stripe==7.9.0
+
 # Data validation
 pydantic==2.5.0
 pydantic-settings==2.1.0
