@@ -333,3 +333,31 @@ def enqueue_caption_generation(generation_id: str, image_url: str, preset_type: 
         preset_type=preset_type,
         job_id=f"caption_gen_{generation_id}"
     )
+
+
+def get_queue_stats() -> Dict[str, Any]:
+    """
+    Get statistics for all queues.
+    
+    Returns:
+        Dict with queue statistics
+    """
+    try:
+        redis_conn = get_redis_connection()
+        stats = {}
+        
+        # Use QueueName enum values
+        for queue_name in [q.value for q in QueueName]:
+            queue = Queue(queue_name, connection=redis_conn)
+            stats[queue_name] = {
+                "count": len(queue),
+                "started_jobs": queue.started_job_registry.count,
+                "finished_jobs": queue.finished_job_registry.count,
+                "failed_jobs": queue.failed_job_registry.count,
+                "deferred_jobs": queue.deferred_job_registry.count,
+            }
+        
+        return stats
+    except Exception as e:
+        logger.error(f"Failed to get queue stats: {e}")
+        return {}
