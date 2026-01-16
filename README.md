@@ -1,4 +1,4 @@
-# Instagram Content Automation
+# Vyra - Instagram Content Automation
 
 AI-powered Instagram content generation platform with face identity consistency. Upload your face once and generate brand-safe, Instagram-ready content with captions, hashtags, and location suggestions.
 
@@ -48,8 +48,8 @@ The fastest way to get started is using Docker Compose, which sets up all servic
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd instagram-content-automation
+git clone https://github.com/rgupta443/vyra.git
+cd vyra
 
 # Copy environment file
 cp .env.example .env
@@ -416,7 +416,7 @@ npm run test:watch
 ## 📁 Project Structure
 
 ```
-instagram-content-automation/
+vyra/
 ├── app/                          # Backend application
 │   ├── api/v1/                   # API endpoints
 │   │   ├── endpoints/            # Route handlers
