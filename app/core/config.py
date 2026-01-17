@@ -61,16 +61,24 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
     
     # CORS
-    BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
+    BACKEND_CORS_ORIGINS: Union[List[str], str] = "http://localhost:3000,http://localhost:8000"
     
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
-    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> Union[List[str], str]:
-        if isinstance(v, str) and not v.startswith("["):
-            return [i.strip() for i in v.split(",")]
-        elif isinstance(v, (list, str)):
+    def assemble_cors_origins(cls, v: Union[str, List[str]]) -> List[str]:
+        if isinstance(v, str):
+            # Handle comma-separated string
+            if not v.startswith("["):
+                return [i.strip() for i in v.split(",") if i.strip()]
+            # Handle JSON string
+            import json
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return [i.strip() for i in v.split(",") if i.strip()]
+        elif isinstance(v, list):
             return v
-        raise ValueError(v)
+        raise ValueError(f"Invalid CORS origins format: {v}")
     
     # Job Queue Configuration
     QUEUE_DEFAULT_TIMEOUT: int = 300  # 5 minutes
