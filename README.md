@@ -105,7 +105,7 @@ npm install
 cp .env.local.example .env.local
 
 # Edit .env.local with your configuration
-# NEXT_PUBLIC_API_URL=http://localhost:8000
+# NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 # NEXTAUTH_URL=http://localhost:3000
 # NEXTAUTH_SECRET=your-nextauth-secret
 
@@ -270,7 +270,7 @@ BACKEND_CORS_ORIGINS=http://localhost:3000,http://localhost:8000
 
 ```bash
 # API Configuration
-NEXT_PUBLIC_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
 
 # NextAuth Configuration
 NEXTAUTH_URL=http://localhost:3000
@@ -576,7 +576,7 @@ redis-cli
 **4. Frontend Can't Connect to Backend**
 ```bash
 # Check NEXT_PUBLIC_API_URL in frontend/.env.local
-# Should be: http://localhost:8000
+# Should be: http://localhost:8000/api/v1
 
 # Check CORS settings in backend .env
 # Should include: http://localhost:3000
