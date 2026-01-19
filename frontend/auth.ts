@@ -70,11 +70,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  session: {
+    strategy: "jwt",
+    maxAge: 7 * 24 * 60 * 60, // 7 days
+  },
   pages: {
     signIn: "/auth/signin",
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger }) {
       if (user) {
         console.log("JWT callback - storing user data in token")
         token.id = user.id
@@ -95,6 +99,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.credits = token.credits as number
       }
       return session
+    },
+    async authorized({ auth, request }) {
+      const isLoggedIn = !!auth?.user
+      const isOnDashboard = request.nextUrl.pathname.startsWith('/dashboard')
+      const isOnGenerate = request.nextUrl.pathname.startsWith('/generate')
+      const isOnProfile = request.nextUrl.pathname.startsWith('/profile')
+      
+      const isProtectedRoute = isOnDashboard || isOnGenerate || isOnProfile
+      
+      if (isProtectedRoute && !isLoggedIn) {
+        console.log('Unauthorized access to protected route, redirecting to signin')
+        return false // Redirect to signin
+      }
+      
+      return true // Allow access
     },
   },
   debug: true,

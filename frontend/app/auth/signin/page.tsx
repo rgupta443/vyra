@@ -24,14 +24,22 @@ export default function SignInPage() {
         redirect: false,
       })
 
+      console.log('SignIn result:', result)
+
       if (result?.error) {
         setError('Invalid email or password')
-      } else {
-        router.push('/dashboard')
+        setLoading(false)
+      } else if (result?.ok) {
+        // Wait a bit for the session to be established
+        console.log('Login successful, waiting for session...')
+        await new Promise(resolve => setTimeout(resolve, 500))
+        
+        // Force a hard navigation to ensure middleware picks up the session
+        window.location.href = '/dashboard'
       }
     } catch (err) {
+      console.error('Sign in error:', err)
       setError('An error occurred. Please try again.')
-    } finally {
       setLoading(false)
     }
   }
