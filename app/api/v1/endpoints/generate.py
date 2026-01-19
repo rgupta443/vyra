@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 from app.core.dependencies import get_db, get_current_user
-from app.models.user import User
+from app.models.user import User, PlanType
 from app.models.face import Face
 from app.models.generation import PresetType
 from app.services.generation_service import GenerationService
