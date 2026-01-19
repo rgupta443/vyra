@@ -84,8 +84,8 @@ export default function GeneratePage() {
         }
       )
 
-      // Redirect to results page with job ID
-      router.push(`/results/${response.data.job_id}`)
+      // Redirect to results page with generation ID
+      router.push(`/results/${response.data.id}`)
     } catch (err: any) {
       if (err.response?.status === 400) {
         setError(err.response.data.detail || 'Please upload a face first')
