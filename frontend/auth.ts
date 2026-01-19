@@ -15,6 +15,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       authorize: async (credentials) => {
         try {
+          console.log("Attempting login with:", credentials.email)
+          
           // Call backend login endpoint
           const loginResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/login`, {
             method: "POST",
@@ -25,11 +27,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }),
           })
 
+          console.log("Login response status:", loginResponse.status)
+
           if (!loginResponse.ok) {
+            console.error("Login failed:", await loginResponse.text())
             return null
           }
 
           const { access_token } = await loginResponse.json()
+          console.log("Got access token, fetching user info...")
 
           // Fetch user info using the access token
           const userResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/auth/me`, {
@@ -39,11 +45,15 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             },
           })
 
+          console.log("User info response status:", userResponse.status)
+
           if (!userResponse.ok) {
+            console.error("Failed to fetch user info:", await userResponse.text())
             return null
           }
 
           const user = await userResponse.json()
+          console.log("User info retrieved:", { id: user.id, email: user.email })
           
           // Return user object with access token
           return {
@@ -66,6 +76,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
+        console.log("JWT callback - storing user data in token")
         token.id = user.id
         token.email = user.email
         token.accessToken = user.accessToken
@@ -76,6 +87,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       if (token) {
+        console.log("Session callback - populating session from token")
         session.user.id = token.id as string
         session.user.email = token.email as string
         session.user.accessToken = token.accessToken as string
@@ -85,4 +97,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return session
     },
   },
+  debug: true,
 })
