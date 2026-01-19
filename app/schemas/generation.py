@@ -1,8 +1,8 @@
 """
 Generation-related Pydantic schemas for request/response models.
 """
-from typing import Optional, List
-from pydantic import BaseModel, field_serializer
+from typing import Optional, List, Any
+from pydantic import BaseModel, field_serializer, model_serializer
 from datetime import datetime
 from uuid import UUID
 
@@ -31,12 +31,24 @@ class GenerationResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
     
-    @field_serializer('id', 'user_id', 'face_id')
-    def serialize_uuid(self, value):
-        """Convert UUID to string."""
-        if isinstance(value, UUID):
-            return str(value)
-        return value
+    @model_serializer
+    def serialize_model(self) -> dict[str, Any]:
+        """Custom serializer to handle UUID conversion."""
+        return {
+            'id': str(self.id) if isinstance(self.id, UUID) else self.id,
+            'user_id': str(self.user_id) if isinstance(self.user_id, UUID) else self.user_id,
+            'face_id': str(self.face_id) if isinstance(self.face_id, UUID) else self.face_id,
+            'preset_type': self.preset_type,
+            'format_type': self.format_type,
+            'status': self.status,
+            'image_url': self.image_url,
+            'caption': self.caption,
+            'hashtags': self.hashtags,
+            'location': self.location,
+            'error_message': self.error_message,
+            'created_at': self.created_at,
+            'completed_at': self.completed_at,
+        }
     
     class Config:
         from_attributes = True
@@ -54,12 +66,20 @@ class GenerationStatusResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
     
-    @field_serializer('id')
-    def serialize_uuid(self, value):
-        """Convert UUID to string."""
-        if isinstance(value, UUID):
-            return str(value)
-        return value
+    @model_serializer
+    def serialize_model(self) -> dict[str, Any]:
+        """Custom serializer to handle UUID conversion."""
+        return {
+            'id': str(self.id) if isinstance(self.id, UUID) else self.id,
+            'status': self.status,
+            'image_url': self.image_url,
+            'caption': self.caption,
+            'hashtags': self.hashtags,
+            'location': self.location,
+            'error_message': self.error_message,
+            'created_at': self.created_at,
+            'completed_at': self.completed_at,
+        }
     
     class Config:
         from_attributes = True
