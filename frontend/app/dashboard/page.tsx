@@ -28,7 +28,7 @@ export default function DashboardPage() {
     try {
       const response = await api.get('/faces/current', {
         headers: {
-          Authorization: `Bearer ${session?.user.id}`,
+          Authorization: `Bearer ${session?.user.accessToken}`,
         },
       })
       setCurrentFace(response.data)
@@ -52,7 +52,7 @@ export default function DashboardPage() {
     try {
       await api.delete('/faces/current', {
         headers: {
-          Authorization: `Bearer ${session?.user.id}`,
+          Authorization: `Bearer ${session?.user.accessToken}`,
         },
       })
       setCurrentFace(null)
@@ -86,7 +86,7 @@ export default function DashboardPage() {
               <div className="bg-white rounded-lg shadow-md p-6">
                 <div className="mb-4">
                   <img
-                    src={currentFace.image_url}
+                    src={`${process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '')}${currentFace.image_url}`}
                     alt="Current face"
                     className="w-full aspect-square object-cover rounded-lg"
                   />

@@ -18,25 +18,13 @@ export default function SignInPage() {
     setLoading(true)
 
     try {
-      const result = await signIn('credentials', {
+      // Use NextAuth's built-in redirect - this is the proper way
+      await signIn('credentials', {
         email,
         password,
-        redirect: false,
+        callbackUrl: '/dashboard',
       })
-
-      console.log('SignIn result:', result)
-
-      if (result?.error) {
-        setError('Invalid email or password')
-        setLoading(false)
-      } else if (result?.ok) {
-        // Wait a bit for the session to be established
-        console.log('Login successful, waiting for session...')
-        await new Promise(resolve => setTimeout(resolve, 500))
-        
-        // Force a hard navigation to ensure middleware picks up the session
-        window.location.href = '/dashboard'
-      }
+      // NextAuth will handle the redirect automatically
     } catch (err) {
       console.error('Sign in error:', err)
       setError('An error occurred. Please try again.')

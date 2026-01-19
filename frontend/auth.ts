@@ -30,7 +30,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           console.log("Login response status:", loginResponse.status)
 
           if (!loginResponse.ok) {
-            console.error("Login failed:", await loginResponse.text())
+            console.error("Login failed")
             return null
           }
 
@@ -48,12 +48,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           console.log("User info response status:", userResponse.status)
 
           if (!userResponse.ok) {
-            console.error("Failed to fetch user info:", await userResponse.text())
+            console.error("Failed to fetch user info")
             return null
           }
 
           const user = await userResponse.json()
-          console.log("User info retrieved:", { id: user.id, email: user.email })
+          console.log("User authenticated successfully:", user.email)
           
           // Return user object with access token
           return {
@@ -72,15 +72,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ],
   session: {
     strategy: "jwt",
-    maxAge: 7 * 24 * 60 * 60, // 7 days
   },
   pages: {
     signIn: "/auth/signin",
   },
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user }) {
       if (user) {
-        console.log("JWT callback - storing user data in token")
+        console.log("JWT callback - adding user to token")
         token.id = user.id
         token.email = user.email
         token.accessToken = user.accessToken
@@ -90,31 +89,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return token
     },
     async session({ session, token }) {
-      if (token) {
-        console.log("Session callback - populating session from token")
-        session.user.id = token.id as string
-        session.user.email = token.email as string
-        session.user.accessToken = token.accessToken as string
-        session.user.planType = token.planType as string
-        session.user.credits = token.credits as number
-      }
+      console.log("Session callback - creating session")
+      session.user.id = token.id as string
+      session.user.email = token.email as string
+      session.user.accessToken = token.accessToken as string
+      session.user.planType = token.planType as string
+      session.user.credits = token.credits as number
       return session
     },
-    async authorized({ auth, request }) {
-      const isLoggedIn = !!auth?.user
-      const isOnDashboard = request.nextUrl.pathname.startsWith('/dashboard')
-      const isOnGenerate = request.nextUrl.pathname.startsWith('/generate')
-      const isOnProfile = request.nextUrl.pathname.startsWith('/profile')
-      
-      const isProtectedRoute = isOnDashboard || isOnGenerate || isOnProfile
-      
-      if (isProtectedRoute && !isLoggedIn) {
-        console.log('Unauthorized access to protected route, redirecting to signin')
-        return false // Redirect to signin
-      }
-      
-      return true // Allow access
-    },
   },
-  debug: true,
 })

@@ -54,7 +54,7 @@ export default function ResultsPage() {
     try {
       const response = await api.get(`/generate/status/${jobId}`, {
         headers: {
-          Authorization: `Bearer ${session?.user.id}`,
+          Authorization: `Bearer ${session?.user.accessToken}`,
         },
       })
       setGeneration(response.data)

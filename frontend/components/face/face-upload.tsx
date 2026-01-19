@@ -66,7 +66,7 @@ export function FaceUpload({ onUploadSuccess }: FaceUploadProps) {
       const response = await api.post('/faces/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
-          Authorization: `Bearer ${session.user.id}`,
+          Authorization: `Bearer ${session.user.accessToken}`,
         },
       })
 

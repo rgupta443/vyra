@@ -84,9 +84,12 @@ async def upload_face(
         # Cache the embedding for faster access
         FaceService.cache_embedding(str(face.id), face_embedding)
         
+        # Return full URL for image access
+        full_image_url = f"/uploads/{face.image_url}"
+        
         return FaceUploadResponse(
             id=face.id,
-            image_url=face.image_url,
+            image_url=full_image_url,
             identity_strength=face.identity_strength,
             is_active=face.is_active,
             created_at=face.created_at,
@@ -116,9 +119,12 @@ async def get_current_face(
     if not face:
         return None
     
+    # Return full URL for image access
+    full_image_url = f"/uploads/{face.image_url}"
+    
     return FaceInfo(
         id=face.id,
-        image_url=face.image_url,
+        image_url=full_image_url,
         identity_strength=face.identity_strength,
         is_active=face.is_active,
         created_at=face.created_at

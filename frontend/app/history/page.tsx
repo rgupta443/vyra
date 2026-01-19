@@ -38,7 +38,7 @@ export default function HistoryPage() {
     try {
       const response = await api.get('/generate/history', {
         headers: {
-          Authorization: `Bearer ${session?.user.id}`,
+          Authorization: `Bearer ${session?.user.accessToken}`,
         },
       })
       setGenerations(response.data)

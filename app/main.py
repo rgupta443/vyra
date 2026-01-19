@@ -12,9 +12,11 @@ Validates Requirements: All requirements (system integration)
 """
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.config import settings
 from app.api.v1.api import api_router
@@ -101,6 +103,14 @@ app.add_middleware(SessionValidationMiddleware)
 
 # Include API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+# Mount static files for uploaded content (faces, generated images)
+# Create upload directory if it doesn't exist
+upload_path = Path(settings.UPLOAD_DIR)
+upload_path.mkdir(parents=True, exist_ok=True)
+
+# Mount the uploads directory to serve static files
+app.mount("/uploads", StaticFiles(directory=str(upload_path)), name="uploads")
 
 
 @app.get("/")

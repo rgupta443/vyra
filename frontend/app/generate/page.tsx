@@ -74,12 +74,12 @@ export default function GeneratePage() {
       const response = await api.post(
         '/generate/image',
         {
-          preset_type: selectedPreset,
-          format_type: selectedFormat,
+          preset_type: selectedPreset.toLowerCase(),
+          format_type: selectedFormat.toLowerCase(),
         },
         {
           headers: {
-            Authorization: `Bearer ${session.user.id}`,
+            Authorization: `Bearer ${session.user.accessToken}`,
           },
         }
       )
