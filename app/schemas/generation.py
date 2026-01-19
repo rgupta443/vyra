@@ -1,8 +1,8 @@
 """
 Generation-related Pydantic schemas for request/response models.
 """
-from typing import Optional, List, Any
-from pydantic import BaseModel, field_serializer, model_serializer
+from typing import Optional, List, Union
+from pydantic import BaseModel, field_validator
 from datetime import datetime
 from uuid import UUID
 
@@ -17,9 +17,9 @@ class GenerationRequest(BaseModel):
 
 class GenerationResponse(BaseModel):
     """Schema for generation response."""
-    id: str
-    user_id: str
-    face_id: str
+    id: Union[str, UUID]
+    user_id: Union[str, UUID]
+    face_id: Union[str, UUID]
     preset_type: PresetType
     format_type: FormatType
     status: GenerationStatus
@@ -31,24 +31,13 @@ class GenerationResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
     
-    @model_serializer
-    def serialize_model(self) -> dict[str, Any]:
-        """Custom serializer to handle UUID conversion."""
-        return {
-            'id': str(self.id) if isinstance(self.id, UUID) else self.id,
-            'user_id': str(self.user_id) if isinstance(self.user_id, UUID) else self.user_id,
-            'face_id': str(self.face_id) if isinstance(self.face_id, UUID) else self.face_id,
-            'preset_type': self.preset_type,
-            'format_type': self.format_type,
-            'status': self.status,
-            'image_url': self.image_url,
-            'caption': self.caption,
-            'hashtags': self.hashtags,
-            'location': self.location,
-            'error_message': self.error_message,
-            'created_at': self.created_at,
-            'completed_at': self.completed_at,
-        }
+    @field_validator('id', 'user_id', 'face_id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        """Convert UUID to string."""
+        if isinstance(v, UUID):
+            return str(v)
+        return v
     
     class Config:
         from_attributes = True
@@ -56,7 +45,7 @@ class GenerationResponse(BaseModel):
 
 class GenerationStatusResponse(BaseModel):
     """Schema for generation status response."""
-    id: str
+    id: Union[str, UUID]
     status: GenerationStatus
     image_url: Optional[str] = None
     caption: Optional[str] = None
@@ -66,20 +55,13 @@ class GenerationStatusResponse(BaseModel):
     created_at: datetime
     completed_at: Optional[datetime] = None
     
-    @model_serializer
-    def serialize_model(self) -> dict[str, Any]:
-        """Custom serializer to handle UUID conversion."""
-        return {
-            'id': str(self.id) if isinstance(self.id, UUID) else self.id,
-            'status': self.status,
-            'image_url': self.image_url,
-            'caption': self.caption,
-            'hashtags': self.hashtags,
-            'location': self.location,
-            'error_message': self.error_message,
-            'created_at': self.created_at,
-            'completed_at': self.completed_at,
-        }
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v):
+        """Convert UUID to string."""
+        if isinstance(v, UUID):
+            return str(v)
+        return v
     
     class Config:
         from_attributes = True
