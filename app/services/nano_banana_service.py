@@ -233,6 +233,11 @@ class NanoBananaService:
             APIConnectionError: For retryable API errors
             NanoBananaError: For non-retryable errors
         """
+        # Demo mode for testing without real API
+        if settings.DEMO_MODE:
+            logger.warning("DEMO MODE: Returning fake image generation result")
+            return await self._generate_demo_image(prompt, face_id, style_parameters, format_config)
+        
         start_time = time.time()
         
         try:
@@ -324,6 +329,43 @@ class NanoBananaService:
             # Unexpected error
             logger.error(f"Unexpected error in image generation: {e}", exc_info=True)
             raise NanoBananaError(f"Unexpected error: {e}")
+    
+    async def _generate_demo_image(
+        self,
+        prompt: str,
+        face_id: str,
+        style_parameters: Dict[str, Any],
+        format_config: Dict[str, Any]
+    ) -> Tuple[str, float, Dict[str, Any]]:
+        """
+        Generate a demo/fake image for testing without real API.
+        
+        Returns placeholder data that passes all validations.
+        """
+        import asyncio
+        
+        # Simulate API delay
+        await asyncio.sleep(2)
+        
+        # Return fake but valid data
+        demo_image_url = "https://via.placeholder.com/1080x1350/FF6B6B/FFFFFF?text=Demo+Image"
+        identity_strength = 0.98  # Above threshold
+        metadata = {
+            "processing_time_seconds": 2.0,
+            "identity_strength": identity_strength,
+            "face_id": face_id,
+            "anti_collage_enforced": True,
+            "demo_mode": True,
+            "prompt": prompt[:100],
+            "format_config": format_config
+        }
+        
+        logger.info(
+            f"Demo image generated for face {face_id}. "
+            f"Identity strength: {identity_strength:.3f}"
+        )
+        
+        return demo_image_url, identity_strength, metadata
     
     async def validate_face_embedding(
         self,

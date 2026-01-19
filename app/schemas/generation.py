@@ -2,7 +2,7 @@
 Generation-related Pydantic schemas for request/response models.
 """
 from typing import Optional, List, Union
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, field_serializer
 from datetime import datetime
 from uuid import UUID
 
@@ -22,7 +22,7 @@ class GenerationResponse(BaseModel):
     face_id: Union[str, UUID]
     preset_type: PresetType
     format_type: FormatType
-    status: GenerationStatus
+    status: str  # Changed to str to allow uppercase conversion
     image_url: Optional[str] = None
     caption: Optional[str] = None
     hashtags: Optional[List[str]] = None
@@ -39,6 +39,16 @@ class GenerationResponse(BaseModel):
             return str(v)
         return v
     
+    @field_validator('status', mode='before')
+    @classmethod
+    def uppercase_status(cls, v):
+        """Convert status to uppercase for frontend compatibility."""
+        if isinstance(v, GenerationStatus):
+            return v.value.upper()
+        if isinstance(v, str):
+            return v.upper()
+        return v
+    
     class Config:
         from_attributes = True
 
@@ -46,7 +56,7 @@ class GenerationResponse(BaseModel):
 class GenerationStatusResponse(BaseModel):
     """Schema for generation status response."""
     id: Union[str, UUID]
-    status: GenerationStatus
+    status: str  # Changed to str to allow uppercase conversion
     image_url: Optional[str] = None
     caption: Optional[str] = None
     hashtags: Optional[List[str]] = None
@@ -61,6 +71,16 @@ class GenerationStatusResponse(BaseModel):
         """Convert UUID to string."""
         if isinstance(v, UUID):
             return str(v)
+        return v
+    
+    @field_validator('status', mode='before')
+    @classmethod
+    def uppercase_status(cls, v):
+        """Convert status to uppercase for frontend compatibility."""
+        if isinstance(v, GenerationStatus):
+            return v.value.upper()
+        if isinstance(v, str):
+            return v.upper()
         return v
     
     class Config:

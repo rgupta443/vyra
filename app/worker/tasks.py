@@ -155,17 +155,25 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
         # Initialize Nano Banana service
         nano_service = NanoBananaService()
         
-        try:
-            # Generate image with identity consistency (Requirement 5.5)
-            image_url, identity_strength, metadata = asyncio.run(
-                nano_service.generate_image(
+        # Define async wrapper to handle all async operations in one event loop
+        async def run_generation():
+            try:
+                # Generate image with identity consistency (Requirement 5.5)
+                image_url, identity_strength, metadata = await nano_service.generate_image(
                     prompt=preset.prompt_template,
                     face_embedding=face.embedding_data,
                     face_id=face_id,
                     style_parameters=preset.style_parameters,
                     format_config=format_params
                 )
-            )
+                return image_url, identity_strength, metadata
+            finally:
+                # Close the async client in the same event loop
+                await nano_service.close()
+        
+        try:
+            # Run all async operations in a single event loop
+            image_url, identity_strength, metadata = asyncio.run(run_generation())
             
             logger.info(
                 f"Image generation successful for generation {generation_id}. "
@@ -215,9 +223,9 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
             logger.info(f"Image generation task completed for generation {generation_id}")
             return result
             
-        finally:
-            # Close the async client
-            asyncio.run(nano_service.close())
+        except Exception:
+            # Re-raise to be handled by outer exception handlers
+            raise
         
     except IdentityConsistencyError as e:
         # Identity consistency failure - not retryable
@@ -382,42 +390,49 @@ def generate_caption_task(generation_id: str, image_url: str, preset_type: str) 
         hashtag_service = HashtagService()
         location_service = LocationService()
         
-        try:
-            # Generate caption (Requirements 9.1, 9.2, 9.5)
-            caption, is_fallback = asyncio.run(
-                caption_service.generate_caption(
+        # Define async wrapper to handle all async operations in one event loop
+        async def run_caption_generation():
+            try:
+                # Generate caption (Requirements 9.1, 9.2, 9.5)
+                caption, is_fallback = await caption_service.generate_caption(
                     preset_type=preset_type,
                     image_url=image_url
                 )
-            )
-            
-            logger.info(
-                f"Caption generated for {generation_id}: "
-                f"{'(fallback)' if is_fallback else '(AI)'}"
-            )
-            
-            # Generate hashtags (Requirements 10.1, 10.3, 10.5)
-            hashtags = asyncio.run(
-                hashtag_service.generate_hashtags(
+                
+                logger.info(
+                    f"Caption generated for {generation_id}: "
+                    f"{'(fallback)' if is_fallback else '(AI)'}"
+                )
+                
+                # Generate hashtags (Requirements 10.1, 10.3, 10.5)
+                hashtags = await hashtag_service.generate_hashtags(
                     preset_type=preset_type,
                     caption=caption
                 )
-            )
-            
-            logger.info(f"Generated {len(hashtags)} hashtags for {generation_id}")
-            
-            # Generate location suggestion (Requirements 11.2, 11.4, 11.5)
-            location = asyncio.run(
-                location_service.suggest_location(
+                
+                logger.info(f"Generated {len(hashtags)} hashtags for {generation_id}")
+                
+                # Generate location suggestion (Requirements 11.2, 11.4, 11.5)
+                location = await location_service.suggest_location(
                     preset_type=preset_type,
                     caption=caption
                 )
-            )
-            
-            if location:
-                logger.info(f"Location suggested for {generation_id}: {location}")
-            else:
-                logger.info(f"No location suggested for {generation_id}")
+                
+                if location:
+                    logger.info(f"Location suggested for {generation_id}: {location}")
+                else:
+                    logger.info(f"No location suggested for {generation_id}")
+                
+                return caption, is_fallback, hashtags, location
+            finally:
+                # Close all async clients in the same event loop
+                await caption_service.close()
+                await hashtag_service.close()
+                await location_service.close()
+        
+        try:
+            # Run all async operations in a single event loop
+            caption, is_fallback, hashtags, location = asyncio.run(run_caption_generation())
             
             # Update generation record with all metadata
             GenerationService.complete_generation(
@@ -443,11 +458,9 @@ def generate_caption_task(generation_id: str, image_url: str, preset_type: str) 
             logger.info(f"Caption generation task completed for generation {generation_id}")
             return result
             
-        finally:
-            # Close all async clients
-            asyncio.run(caption_service.close())
-            asyncio.run(hashtag_service.close())
-            asyncio.run(location_service.close())
+        except Exception:
+            # Re-raise to be handled by outer exception handlers
+            raise
         
     except (RetryableTaskError, NonRetryableTaskError):
         # Re-raise custom task errors

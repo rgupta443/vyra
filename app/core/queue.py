@@ -73,9 +73,11 @@ class QueueManager:
     
     def __init__(self):
         """Initialize queue manager with Redis connection."""
+        # Use separate Redis client for RQ that doesn't decode responses
+        # RQ stores pickled Python objects which are binary data
         self.redis_client = redis.from_url(
             settings.REDIS_URL,
-            decode_responses=True,
+            decode_responses=False,  # RQ needs binary data for job serialization
             socket_connect_timeout=5,
             socket_timeout=5,
             retry_on_timeout=True,
