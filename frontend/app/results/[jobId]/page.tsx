@@ -223,6 +223,7 @@ export default function ResultsPage() {
                   alt="Generated content"
                   fill
                   className="object-cover"
+                  unoptimized
                 />
               </div>
             </div>

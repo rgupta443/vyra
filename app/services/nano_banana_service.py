@@ -347,8 +347,8 @@ class NanoBananaService:
         # Simulate API delay
         await asyncio.sleep(2)
         
-        # Return fake but valid data
-        demo_image_url = "https://via.placeholder.com/1080x1350/FF6B6B/FFFFFF?text=Demo+Image"
+        # Return fake but valid data using placehold.co (more reliable than via.placeholder.com)
+        demo_image_url = "https://placehold.co/1080x1350/ff6b6b/ffffff/png?text=Demo+Image"
         identity_strength = 0.98  # Above threshold
         metadata = {
             "processing_time_seconds": 2.0,
