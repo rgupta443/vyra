@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     # External API Keys
     OPENAI_API_KEY: str
     NANO_BANANA_API_KEY: str
+    REPLICATE_API_TOKEN: str
     STRIPE_SECRET_KEY: str
     STRIPE_PUBLISHABLE_KEY: str
     STRIPE_WEBHOOK_SECRET: str

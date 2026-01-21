@@ -97,11 +97,9 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
         NonRetryableTaskError: For permanent failures that should not be retried
     """
     # Import services at module level to avoid UnboundLocalError
-    from app.services.nano_banana_service import (
-        NanoBananaService,
-        IdentityConsistencyError,
-        FormatComplianceError,
-        APIConnectionError
+    from app.services.replicate_service import (
+        ReplicateService,
+        ReplicateError
     )
     from app.services.preset_service import PresetService
     from app.services.format_compliance_service import FormatComplianceService
@@ -152,106 +150,91 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
             format_type
         )
         
-        # Initialize Nano Banana service
-        nano_service = NanoBananaService()
+        # Get face image path - handle both absolute and relative paths
+        face_image_url = face.image_url
+        if face_image_url.startswith('/uploads/'):
+            # Remove leading slash and use relative path
+            face_image_path = face_image_url[1:]  # Remove leading /
+        elif face_image_url.startswith('uploads/'):
+            # Already relative
+            face_image_path = face_image_url
+        else:
+            # Assume it's just the filename or partial path
+            face_image_path = f"uploads/{face_image_url}"
         
-        # Define async wrapper to handle all async operations in one event loop
-        async def run_generation():
-            try:
-                # Generate image with identity consistency (Requirement 5.5)
-                image_url, identity_strength, metadata = await nano_service.generate_image(
-                    prompt=preset.prompt_template,
-                    face_embedding=face.embedding_data,
-                    face_id=face_id,
-                    style_parameters=preset.style_parameters,
-                    format_config=format_params
-                )
-                return image_url, identity_strength, metadata
-            finally:
-                # Close the async client in the same event loop
-                await nano_service.close()
+        logger.info(f"Using face image path: {face_image_path}")
         
-        try:
-            # Run all async operations in a single event loop
-            image_url, identity_strength, metadata = asyncio.run(run_generation())
-            
-            logger.info(
-                f"Image generation successful for generation {generation_id}. "
-                f"Identity strength: {identity_strength:.3f}"
+        # Initialize Replicate service
+        replicate_service = ReplicateService()
+        
+        # Generate image with identity consistency (Requirement 5.5)
+        image_url, identity_strength, metadata = asyncio.run(
+            replicate_service.generate_image(
+                prompt=preset.prompt_template,
+                face_image_path=face_image_path,
+                face_id=face_id,
+                style_parameters=preset.style_parameters,
+                format_config=format_params
             )
-            
-            # Validate generation output
-            if not image_url:
-                raise NonRetryableTaskError("Image generation returned no URL")
-            
-            if identity_strength < 0.95:
-                raise IdentityConsistencyError(
-                    f"Identity strength {identity_strength:.3f} below threshold 0.95"
-                )
-            
-            # Update generation with image URL (partial completion)
-            generation = db.query(Generation).filter(Generation.id == generation_id).first()
-            if generation:
-                generation.image_url = image_url
-                generation.metadata = metadata
-                db.commit()
-            
-            # Queue caption generation task
-            from app.core.queue import enqueue_caption_generation
-            try:
-                caption_job = enqueue_caption_generation(
-                    generation_id=generation_id,
-                    image_url=image_url,
-                    preset_type=preset_type
-                )
-                logger.info(
-                    f"Queued caption generation job {caption_job.id} for generation {generation_id}"
-                )
-            except Exception as e:
-                logger.error(f"Failed to queue caption generation: {e}")
-                # Don't fail the image generation if caption queueing fails
-            
-            result = {
-                "generation_id": generation_id,
-                "status": "completed",
-                "image_url": image_url,
-                "identity_strength": identity_strength,
-                "format_validated": True,
-                "metadata": metadata
-            }
-            
-            logger.info(f"Image generation task completed for generation {generation_id}")
-            return result
-            
-        except Exception:
-            # Re-raise to be handled by outer exception handlers
-            raise
+        )
         
-    except IdentityConsistencyError as e:
-        # Identity consistency failure - not retryable
-        logger.error(f"Identity consistency failure for generation {generation_id}: {e}")
+        logger.info(
+            f"Image generation successful for generation {generation_id}. "
+            f"Identity strength: {identity_strength:.3f}"
+        )
+        
+        # Validate generation output
+        if not image_url:
+            raise NonRetryableTaskError("Image generation returned no URL")
+        
+        if identity_strength < 0.95:
+            raise NonRetryableTaskError(
+                f"Identity strength {identity_strength:.3f} below threshold 0.95"
+            )
+        
+        # Update generation with image URL (partial completion)
+        generation = db.query(Generation).filter(Generation.id == generation_id).first()
+        if generation:
+            generation.image_url = image_url
+            generation.metadata = metadata
+            db.commit()
+        
+        # Queue caption generation task
+        from app.core.queue import enqueue_caption_generation
+        try:
+            caption_job = enqueue_caption_generation(
+                generation_id=generation_id,
+                image_url=image_url,
+                preset_type=preset_type
+            )
+            logger.info(
+                f"Queued caption generation job {caption_job.id} for generation {generation_id}"
+            )
+        except Exception as e:
+            logger.error(f"Failed to queue caption generation: {e}")
+            # Don't fail the image generation if caption queueing fails
+        
+        result = {
+            "generation_id": generation_id,
+            "status": "completed",
+            "image_url": image_url,
+            "identity_strength": identity_strength,
+            "format_validated": True,
+            "metadata": metadata
+        }
+        
+        logger.info(f"Image generation task completed for generation {generation_id}")
+        return result
+        
+    except ReplicateError as e:
+        # Replicate API error - retryable
+        logger.error(f"Replicate API error for generation {generation_id}: {e}")
         GenerationService.fail_generation(
             db, generation_id, 
-            f"Identity consistency failure: {str(e)}",
+            f"Image generation failed: {str(e)}",
             refund_credit=True
         )
-        raise NonRetryableTaskError(f"Identity consistency failure: {str(e)}")
-    
-    except FormatComplianceError as e:
-        # Format compliance failure - not retryable
-        logger.error(f"Format compliance failure for generation {generation_id}: {e}")
-        GenerationService.fail_generation(
-            db, generation_id,
-            f"Format compliance failure: {str(e)}",
-            refund_credit=True
-        )
-        raise NonRetryableTaskError(f"Format compliance failure: {str(e)}")
-    
-    except APIConnectionError as e:
-        # API connection error - retryable
-        logger.warning(f"API connection error for generation {generation_id}: {e}")
-        # Don't update status yet - let retry mechanism handle it
-        raise RetryableTaskError(f"API connection error: {str(e)}")
+        raise RetryableTaskError(f"Replicate API error: {str(e)}")
     
     except (RetryableTaskError, NonRetryableTaskError):
         # Re-raise custom task errors
