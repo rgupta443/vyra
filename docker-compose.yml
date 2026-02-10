@@ -76,9 +76,14 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - REDIS_DB=0
-      - DEMO_MODE=false  # Real Replicate API enabled
+      - DEMO_MODE=false  # Real API enabled
       - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GOOGLE_CLOUD_PROJECT_ID=${GOOGLE_CLOUD_PROJECT_ID}
+      - GOOGLE_CLOUD_LOCATION=${GOOGLE_CLOUD_LOCATION}
+      - GOOGLE_CLOUD_CREDENTIALS_PATH=${GOOGLE_CLOUD_CREDENTIALS_PATH}
+      - IMAGE_GENERATION_PROVIDER=${IMAGE_GENERATION_PROVIDER}
+      - BACKEND_URL=http://localhost:8000  # External URL for frontend to access images
     volumes:
       - .:/app
       - ./uploads:/app/uploads

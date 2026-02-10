@@ -26,6 +26,10 @@ tenacity==8.2.3
 openai==1.6.1
 replicate==0.22.0
 
+# Google Cloud AI Platform (Gemini/Imagen)
+google-cloud-aiplatform==1.38.1
+google-auth==2.25.2
+
 # Payment processing
 stripe==7.9.0
 

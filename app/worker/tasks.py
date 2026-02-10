@@ -101,12 +101,17 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
         ReplicateService,
         ReplicateError
     )
+    from app.services.gemini_service import (
+        GeminiService,
+        GeminiError
+    )
     from app.services.preset_service import PresetService
     from app.services.format_compliance_service import FormatComplianceService
     from app.services.generation_service import GenerationService
     from app.core.database import SessionLocal
     from app.models.face import Face
     from app.models.generation import PresetType, GenerationStatus, Generation
+    from app.core.config import settings
     import asyncio
     
     task_context = {
@@ -164,12 +169,20 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
         
         logger.info(f"Using face image path: {face_image_path}")
         
-        # Initialize Replicate service
-        replicate_service = ReplicateService()
+        # Initialize image generation service based on provider setting
+        provider = settings.IMAGE_GENERATION_PROVIDER.lower()
+        logger.info(f"Using image generation provider: {provider}")
+        
+        if provider == "gemini":
+            image_service = GeminiService()
+            service_error = GeminiError
+        else:  # Default to replicate
+            image_service = ReplicateService()
+            service_error = ReplicateError
         
         # Generate image with identity consistency (Requirement 5.5)
         image_url, identity_strength, metadata = asyncio.run(
-            replicate_service.generate_image(
+            image_service.generate_image(
                 prompt=preset.prompt_template,
                 face_image_path=face_image_path,
                 face_id=face_id,
@@ -187,9 +200,14 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
         if not image_url:
             raise NonRetryableTaskError("Image generation returned no URL")
         
-        if identity_strength < 0.95:
+        # Provider-specific identity strength thresholds
+        # Replicate (InstantID) has face-specific features: 0.95
+        # Gemini (Imagen 3) doesn't have face consistency: 0.85
+        min_threshold = 0.85 if settings.IMAGE_GENERATION_PROVIDER == "gemini" else 0.95
+        
+        if identity_strength < min_threshold:
             raise NonRetryableTaskError(
-                f"Identity strength {identity_strength:.3f} below threshold 0.95"
+                f"Identity strength {identity_strength:.3f} below threshold {min_threshold:.2f}"
             )
         
         # Update generation with image URL (partial completion)
@@ -226,15 +244,15 @@ def generate_image_task(generation_id: str, user_id: str, face_id: str,
         logger.info(f"Image generation task completed for generation {generation_id}")
         return result
         
-    except ReplicateError as e:
-        # Replicate API error - retryable
-        logger.error(f"Replicate API error for generation {generation_id}: {e}")
+    except (ReplicateError, GeminiError) as e:
+        # Image generation API error - retryable
+        logger.error(f"Image generation API error for generation {generation_id}: {e}")
         GenerationService.fail_generation(
             db, generation_id, 
             f"Image generation failed: {str(e)}",
             refund_credit=True
         )
-        raise RetryableTaskError(f"Replicate API error: {str(e)}")
+        raise RetryableTaskError(f"Image generation API error: {str(e)}")
     
     except (RetryableTaskError, NonRetryableTaskError):
         # Re-raise custom task errors

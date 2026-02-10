@@ -49,6 +49,14 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str
     STRIPE_WEBHOOK_SECRET: str
     
+    # Google Cloud / Gemini Configuration
+    GOOGLE_CLOUD_PROJECT_ID: Optional[str] = None
+    GOOGLE_CLOUD_LOCATION: str = "us-central1"
+    GOOGLE_CLOUD_CREDENTIALS_PATH: Optional[str] = None
+    
+    # Image Generation Provider Selection
+    IMAGE_GENERATION_PROVIDER: str = "replicate"  # Options: "replicate", "gemini"
+    
     # Demo/Test Mode (for development without real APIs)
     DEMO_MODE: bool = False
     
@@ -63,6 +71,9 @@ class Settings(BaseSettings):
     # File Storage
     UPLOAD_DIR: str = "uploads"
     MAX_UPLOAD_SIZE: int = 10 * 1024 * 1024  # 10MB
+    
+    # Backend URL for generating full URLs (used by workers)
+    BACKEND_URL: str = "http://localhost:8000"
     
     # CORS
     BACKEND_CORS_ORIGINS: Union[List[str], str] = "http://localhost:3000,http://localhost:8000"
