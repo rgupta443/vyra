@@ -39,6 +39,13 @@ class ReplicateService:
     # Identity consistency threshold
     MIN_IDENTITY_STRENGTH = 0.95
     
+    # Rate limiting: 6 requests per minute = 10 seconds between requests
+    # Using 12 seconds to be extra safe and account for API processing time
+    RATE_LIMIT_DELAY = 12  # seconds between API calls
+    
+    # Class-level variable to track last API call time
+    _last_api_call_time = 0
+    
     def __init__(self, api_token: Optional[str] = None):
         """
         Initialize Replicate service.
@@ -49,9 +56,24 @@ class ReplicateService:
         self.api_token = api_token or settings.REPLICATE_API_TOKEN
         self.client = replicate.Client(api_token=self.api_token)
     
+    def _enforce_rate_limit(self):
+        """
+        Enforce rate limiting to avoid exceeding Replicate's 6 requests per minute limit.
+        Waits if necessary to maintain the rate limit.
+        """
+        current_time = time.time()
+        time_since_last_call = current_time - ReplicateService._last_api_call_time
+        
+        if time_since_last_call < self.RATE_LIMIT_DELAY:
+            wait_time = self.RATE_LIMIT_DELAY - time_since_last_call
+            logger.info(f"Rate limiting: waiting {wait_time:.1f}s before next API call")
+            time.sleep(wait_time)
+        
+        ReplicateService._last_api_call_time = time.time()
+    
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=2, min=2, max=10),
+        stop=stop_after_attempt(5),  # Increased attempts for rate limit retries
+        wait=wait_exponential(multiplier=3, min=5, max=30),  # Longer waits for rate limits
         retry=retry_if_exception_type(Exception),
         before_sleep=before_sleep_log(logger, logging.WARNING)
     )
@@ -83,6 +105,9 @@ class ReplicateService:
         if settings.DEMO_MODE:
             logger.warning("DEMO MODE: Returning fake image generation result")
             return await self._generate_demo_image(prompt, face_id, style_parameters, format_config)
+        
+        # Enforce rate limiting before making API call
+        self._enforce_rate_limit()
         
         start_time = time.time()
         
@@ -158,6 +183,14 @@ class ReplicateService:
             
         except Exception as e:
             logger.error(f"Error in Replicate image generation: {e}", exc_info=True)
+            
+            # Check if it's a rate limit error
+            error_str = str(e).lower()
+            if "throttled" in error_str or "rate limit" in error_str:
+                logger.warning(f"Rate limit hit, will retry with exponential backoff: {e}")
+                # Re-raise to trigger retry with exponential backoff
+                raise ReplicateError(f"Rate limit exceeded: {e}")
+            
             raise ReplicateError(f"Image generation failed: {e}")
     
     async def _generate_demo_image(
