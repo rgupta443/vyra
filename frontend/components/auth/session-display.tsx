@@ -8,21 +8,21 @@ export function SessionDisplay() {
   const router = useRouter()
 
   if (status === 'loading') {
-    return <div className="text-sm text-gray-600">Loading...</div>
+    return <div className="text-sm text-gray-500">Loading...</div>
   }
 
   if (!session) {
     return (
-      <div className="flex gap-4">
+      <div className="flex gap-3">
         <button
           onClick={() => router.push('/auth/signin')}
-          className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+          className="btn-ghost px-4 py-2 text-sm"
         >
           Sign In
         </button>
         <button
           onClick={() => router.push('/auth/signup')}
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+          className="btn-gradient px-4 py-2 text-sm"
         >
           Sign Up
         </button>
@@ -32,10 +32,16 @@ export function SessionDisplay() {
 
   return (
     <div className="flex items-center gap-4">
-      <span className="text-sm text-gray-700">{session.user.email}</span>
+      <span className="text-sm text-gray-400">{session.user.email}</span>
+      <button
+        onClick={() => router.push('/dashboard')}
+        className="btn-gradient px-4 py-2 text-sm"
+      >
+        Dashboard
+      </button>
       <button
         onClick={() => signOut({ callbackUrl: '/' })}
-        className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-gray-900"
+        className="text-sm text-gray-500 hover:text-white transition-colors"
       >
         Sign Out
       </button>

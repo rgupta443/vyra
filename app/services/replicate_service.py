@@ -34,7 +34,8 @@ class ReplicateService:
     """
     
     # InstantID model for face consistency
-    MODEL_VERSION = "zsxkib/instant-id:dd5b2f35c0a0c3a8db2cbd90d1e5c88c40e9e3d1"
+    # Using model without version to get the latest version
+    MODEL_VERSION = "zsxkib/instant-id"
     
     # Identity consistency threshold
     MIN_IDENTITY_STRENGTH = 0.95
